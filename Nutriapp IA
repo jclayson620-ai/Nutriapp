@@ -1,0 +1,177 @@
+// ========================
+// NutriAI – App Completo
+// ========================
+
+// 1. Inicialização do App
+function initApp() {
+  console.log("NutriAI iniciado!");
+  showHomeScreen();
+}
+
+// 2. Tela Inicial
+function showHomeScreen() {
+  renderUI({
+    title: "NutriAI",
+    buttons: [
+      { label: "Tirar Foto do Prato", action: takeFoodPhoto },
+      { label: "Meus Registros", action: showUserProfile },
+      { label: "Planos e Dietas", action: showDietPlans },
+      { label: "Assinatura Premium", action: showSubscription }
+    ]
+  });
+}
+
+// 3. Tirar Foto e Analisar
+function takeFoodPhoto() {
+  camera.capturePhoto().then(photo => {
+    recognizeFoodWithGemini(photo);
+  });
+}
+
+// 4. Reconhecimento de Alimentos via Gemini
+async function recognizeFoodWithGemini(photo) {
+  const apiKey = "AIzaSyCyuhQfUj9bEuV2JSndSt3-JIonFxd6KPE";
+  const url = "https://gemini.googleapis.com/v1/images:analyze";
+
+  const base64Photo = await photo.toBase64();
+
+  const payload = {
+    requests: [
+      {
+        image: { content: base64Photo },
+        features: [
+          { type: "FOOD_DETECTION" },
+          { type: "LABEL_DETECTION" }
+        ]
+      }
+    ]
+  };
+
+  const response = await fetch(url + "?key=" + apiKey, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+
+  const result = await response.json();
+  const foodData = parseGeminiResponse(result);
+
+  saveMeal(foodData);
+  showMealResult(foodData);
+}
+
+// 5. Processar resposta da Gemini
+function parseGeminiResponse(response) {
+  const food = response.responses[0].labelAnnotations[0].description;
+  return {
+    name: food,
+    calories: estimateCalories(food),
+    protein: estimateProtein(food),
+    carbs: estimateCarbs(food),
+    fat: estimateFat(food),
+    fiber: estimateFiber(food)
+  };
+}
+
+// ========================
+// 6. Mostrar resultado da refeição
+// ========================
+function showMealResult(data) {
+  renderUI({
+    title: "Informações Nutricionais",
+    text: `Prato: ${data.name}
+Calorias: ${data.calories} kcal
+Proteínas: ${data.protein} g
+Carboidratos: ${data.carbs} g
+Gorduras: ${data.fat} g
+Fibras: ${data.fiber} g`,
+    buttons: [
+      { label: "Adicionar ao Histórico", action: () => saveMeal(data) },
+      { label: "Voltar", action: showHomeScreen }
+    ]
+  });
+}
+
+// ========================
+// 7. Histórico e Perfil
+// ========================
+function saveMeal(data) {
+  Database.save("meals", data);
+}
+
+function showUserProfile() {
+  const profile = Database.get("userProfile") || { weight: 70, height: 170, goal: "Manutenção" };
+  const meals = Database.get("meals") || [];
+
+  renderUI({
+    title: "Meu Perfil",
+    text: `Peso: ${profile.weight} kg
+Altura: ${profile.height} cm
+Objetivo: ${profile.goal}`,
+    charts: createProgressCharts(meals),
+    buttons: [{ label: "Voltar", action: showHomeScreen }]
+  });
+}
+
+// ========================
+// 8. Planos e Dietas
+// ========================
+function showDietPlans() {
+  const profile = Database.get("userProfile") || { weight: 70, height: 170, goal: "Manutenção" };
+  const dietPlan = AI.generateDietPlan(profile);
+
+  renderUI({
+    title: "Plano de Dieta Personalizado",
+    text: dietPlan.summary,
+    buttons: [{ label: "Voltar", action: showHomeScreen }]
+  });
+}
+
+// ========================
+// 9. Assinatura Premium
+// ========================
+function showSubscription() {
+  renderUI({
+    title: "Assinatura Premium",
+    text: "Acesse recursos exclusivos, receitas detalhadas e recomendações avançadas.",
+    buttons: [
+      { label: "Assinar com Stripe", action: () => paySubscription("Stripe") },
+      { label: "Assinar com PayPal", action: () => paySubscription("PayPal") },
+      { label: "Voltar", action: showHomeScreen }
+    ]
+  });
+}
+
+function paySubscription(method) {
+  Payment.process(method, { amount: 5, currency: "USD" })
+    .then(() => alert("Assinatura ativa!"))
+    .catch(err => alert("Erro no pagamento: " + err.message));
+}
+
+// ========================
+// 10. Funções auxiliares de estimativa nutricional
+// ========================
+function estimateCalories(food) {
+  // Substituir por base de dados real
+  return 200;
+}
+function estimateProtein(food) { return 10; }
+function estimateCarbs(food) { return 30; }
+function estimateFat(food) { return 8; }
+function estimateFiber(food) { return 5; }
+
+// ========================
+// 11. Gráficos de progresso
+// ========================
+function createProgressCharts(meals) {
+  // Simples gráfico de exemplo
+  return {
+    calories: meals.reduce((sum, m) => sum + m.calories, 0) / meals.length || 0,
+    protein: meals.reduce((sum, m) => sum + m.protein, 0) / meals.length || 0
+  };
+}
+
+// ========================
+// 12. Iniciar App
+// ========================
+initApp();
